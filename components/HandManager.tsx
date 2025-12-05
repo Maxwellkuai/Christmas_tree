@@ -26,7 +26,7 @@ export const HandManager: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const handLandmarkerRef = useRef<HandLandmarker | null>(null);
-  const requestRef = useRef<number>();
+  const requestRef = useRef<number | null>(null);
 
   useEffect(() => {
     const initMediaPipe = async () => {

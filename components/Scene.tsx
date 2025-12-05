@@ -8,10 +8,13 @@ import { useHandControl } from './HandManager';
 import { TreeState } from '../types';
 import * as THREE from 'three';
 
-export const Scene: React.FC = () => {
+interface SceneProps {
+  photos: string[];
+}
+
+export const Scene: React.FC<SceneProps> = ({ photos }) => {
   const { gestureState } = useHandControl();
   const [treeState, setTreeState] = useState<TreeState>(TreeState.FORMED);
-  const cameraRef = useRef<THREE.PerspectiveCamera>(null);
   
   // Logic linking gestures to state
   useEffect(() => {
@@ -34,10 +37,6 @@ export const Scene: React.FC = () => {
       // Smooth camera orbit
       const r = 20; // Radius
       const angle = state.clock.elapsedTime * 0.1 + targetX; 
-      
-      // Lerp camera position logic could go here, but OrbitControls might fight it.
-      // We'll modify the OrbitControls target or camera position directly if manual.
-      // For simplicity in this demo, let's just rotate the entire scene wrapper or use simple lerp on camera.
       
       const targetCamPos = new THREE.Vector3(
         Math.sin(angle) * r,
@@ -85,13 +84,13 @@ export const Scene: React.FC = () => {
         <Foliage count={12000} treeState={treeState} />
         <Ornaments count={200} treeState={treeState} type="ball" />
         <Ornaments count={50} treeState={treeState} type="gift" />
-        <PolaroidGallery treeState={treeState} />
+        <PolaroidGallery treeState={treeState} photos={photos} />
         
         {/* Floor Reflection */}
         <ContactShadows opacity={0.5} scale={30} blur={2} far={10} resolution={256} color="#000000" />
       </group>
 
-      <EffectComposer disableNormalPass>
+      <EffectComposer enableNormalPass={false}>
         <Bloom 
             luminanceThreshold={0.2} // Bloom on darker golds too
             mipmapBlur 

@@ -1,5 +1,5 @@
-import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { useFrame, useLoader } from '@react-three/fiber';
+import React, { useMemo, useRef, useEffect } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { TreeState } from '../types';
 import { Image } from '@react-three/drei';
@@ -11,7 +11,6 @@ interface OrnamentsProps {
 }
 
 const tempObject = new THREE.Object3D();
-const tempPos = new THREE.Vector3();
 
 export const Ornaments: React.FC<OrnamentsProps> = ({ count, treeState, type }) => {
   const meshRef = useRef<THREE.InstancedMesh>(null);
@@ -64,10 +63,6 @@ export const Ornaments: React.FC<OrnamentsProps> = ({ count, treeState, type }) 
     const isForming = treeState === TreeState.FORMED;
 
     for (let i = 0; i < count; i++) {
-      // Get current position (simulated via stored data in UserData or reconstructed)
-      // Since we can't easily read back from matrix every frame efficiently without drift,
-      // we interpolate a virtual "t" value for each particle or just lerp positions directly.
-      
       // To simulate "physics" weight:
       // Gifts (heavy) move slower. Balls (light) move faster.
       const weight = type === 'gift' ? 0.8 : 1.2;
@@ -123,49 +118,85 @@ export const Ornaments: React.FC<OrnamentsProps> = ({ count, treeState, type }) 
   );
 };
 
-// Separate component for Polaroids to handle textures easier
-export const PolaroidGallery: React.FC<{ treeState: TreeState }> = ({ treeState }) => {
-  const count = 12;
-  // Use picsum for placeholders
-  const photos = useMemo(() => Array.from({length: count}).map((_, i) => ({
-    id: i,
-    url: `https://picsum.photos/seed/${i + 100}/300/300`,
-    targetPos: new THREE.Vector3(
-      Math.sin(i / count * Math.PI * 2) * 3,
-      (i / count) * 10,
-      Math.cos(i / count * Math.PI * 2) * 3
-    ),
-    chaosPos: new THREE.Vector3(
-        (Math.random() - 0.5) * 30,
-        (Math.random() - 0.5) * 30,
-        (Math.random() - 0.5) * 30
-    )
-  })), []);
+interface PolaroidGalleryProps {
+  treeState: TreeState;
+  photos: string[];
+}
+
+export const PolaroidGallery: React.FC<PolaroidGalleryProps> = ({ treeState, photos }) => {
+  const count = 60; // Increased to 60 for "Many photos"
+  
+  const galleryItems = useMemo(() => {
+    return Array.from({length: count}).map((_, i) => {
+        // Spiral distribution logic
+        const t = i / count;
+        // More windings for dense look
+        const angle = t * Math.PI * 18; 
+        const height = t * 14 - 1.5; 
+        const radius = 5.2 * (1 - height / 15) + 0.6; // Slightly further out than ornaments
+
+        return {
+            id: i,
+            targetPos: new THREE.Vector3(
+                Math.cos(angle) * radius,
+                height,
+                Math.sin(angle) * radius
+            ),
+            chaosPos: new THREE.Vector3(
+                (Math.random() - 0.5) * 40,
+                (Math.random() - 0.5) * 40,
+                (Math.random() - 0.5) * 40
+            )
+        };
+    });
+  }, [count]);
 
   return (
     <group>
-      {photos.map((photo, i) => (
-        <PolaroidItem key={i} data={photo} treeState={treeState} index={i} />
+      {galleryItems.map((item, i) => (
+        <PolaroidItem 
+            key={i} 
+            data={item} 
+            treeState={treeState} 
+            // Cycle through photos provided via props
+            url={photos[i % photos.length]} 
+        />
       ))}
     </group>
   );
 };
 
-const PolaroidItem = ({ data, treeState, index }: any) => {
+const PolaroidItem = ({ data, treeState, url }: any) => {
     const ref = useRef<THREE.Group>(null);
+    const scaleRef = useRef(0);
+    const randomOffset = useRef(Math.random());
     
     useFrame((state, delta) => {
         if(!ref.current) return;
         const target = treeState === TreeState.FORMED ? data.targetPos : data.chaosPos;
-        ref.current.position.lerp(target, delta * 2);
         
-        // Look at center when formed, random when chaos
+        // Smooth lerp for position
+        const speed = 2 + (randomOffset.current * 0.5); // Variation in speed
+        ref.current.position.lerp(target, delta * speed);
+        
+        // Orientation logic
         if (treeState === TreeState.FORMED) {
+             // Look slightly up and out
              ref.current.lookAt(0, data.targetPos.y, 0);
+             // Gentle sway
+             const t = state.clock.elapsedTime + data.id;
+             ref.current.position.y += Math.sin(t) * 0.003;
+             ref.current.rotation.z = Math.sin(t * 0.5) * 0.1; // Subtle tilt
         } else {
-            ref.current.rotation.x += delta * 0.1;
-            ref.current.rotation.y += delta * 0.1;
+            // Chaos rotation
+            ref.current.rotation.x += delta * 0.5;
+            ref.current.rotation.y += delta * 0.3;
         }
+
+        // Pop in animation
+        const targetScale = treeState === TreeState.FORMED ? 0.8 : 1.0; // Slightly larger in chaos
+        scaleRef.current = THREE.MathUtils.lerp(scaleRef.current, targetScale, 0.05);
+        ref.current.scale.setScalar(scaleRef.current);
     });
 
     return (
@@ -173,13 +204,13 @@ const PolaroidItem = ({ data, treeState, index }: any) => {
             {/* Paper backing */}
             <mesh position={[0, 0, -0.01]}>
                 <planeGeometry args={[1.2, 1.5]} />
-                <meshStandardMaterial color="#fffff0" roughness={0.9} />
+                <meshStandardMaterial color="#fffff0" roughness={0.9} side={THREE.DoubleSide} />
             </mesh>
             {/* Photo */}
             <Image 
-                url={data.url} 
+                url={url} 
                 scale={[1, 1]} 
-                position={[0, 0.15, 0]}
+                position={[0, 0.15, 0.01]}
                 transparent
             />
         </group>
