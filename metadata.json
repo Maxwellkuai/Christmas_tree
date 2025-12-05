@@ -1,0 +1,7 @@
+{
+  "name": "Grand Luxury Interactive Christmas Tree",
+  "description": "A cinematic, high-fidelity 3D interactive Christmas tree with a dual-position particle system. Features Trump-style luxury aesthetics (Emerald & Gold), real-time hand gesture control (Open to Unleash, Closed to Form, Pinch to Zoom), and Polaroid-style photo decorations.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
